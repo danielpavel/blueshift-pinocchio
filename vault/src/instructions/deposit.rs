@@ -2,7 +2,9 @@ use core::mem::size_of;
 
 use pinocchio::{
     account_info::AccountInfo, program_error::ProgramError, pubkey::find_program_address,
+    ProgramResult,
 };
+use pinocchio_system::instructions::Transfer;
 
 /*
  * =============================
@@ -37,7 +39,7 @@ impl<'a> TryFrom<&'a [AccountInfo]> for DepositAccounts<'a> {
         }
 
         let (vault_key, _) = find_program_address(&[b"vault", owner.key()], &crate::ID);
-        if vault_key.ne(vault) {
+        if vault_key.ne(vault.key()) {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
@@ -54,7 +56,7 @@ pub struct DepositInstructionData {
     pub amount: u64,
 }
 
-impl<'a> TryFrom<&'a &[u8]> for DepositInstructionData {
+impl<'a> TryFrom<&'a [u8]> for DepositInstructionData {
     type Error = ProgramError;
 
     fn try_from(data: &'a [u8]) -> Result<Self, Self::Error> {
@@ -83,7 +85,7 @@ pub struct Deposit<'a> {
     pub instruction_data: DepositInstructionData,
 }
 
-impl<'a> TryFrom<(&'a [u8], &'a [AccountInfo])> for withdraw<'a> {
+impl<'a> TryFrom<(&'a [u8], &'a [AccountInfo])> for Deposit<'a> {
     type Error = ProgramError;
 
     fn try_from((data, accounts): (&'a [u8], &'a [AccountInfo])) -> Result<Self, Self::Error> {
@@ -97,6 +99,17 @@ impl<'a> TryFrom<(&'a [u8], &'a [AccountInfo])> for withdraw<'a> {
     }
 }
 
-// impl<'a> Deposit<'a>  {
-//     pub const DISCRIMINATOR:
-// }
+impl<'a> Deposit<'a> {
+    pub const DISCRIMINATOR: &'a u8 = &0;
+
+    pub fn process(&mut self) -> ProgramResult {
+        Transfer {
+            from: self.accounts.owner,
+            to: self.accounts.vault,
+            lamports: self.instruction_data.amount,
+        }
+        .invoke()?;
+
+        Ok(())
+    }
+}
