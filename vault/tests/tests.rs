@@ -1,7 +1,10 @@
+use std::collections::HashMap;
+
 use mollusk_svm::{
+    account_store::AccountStore,
     program::keyed_account_for_system_program,
-    result::{Check, InstructionResult},
-    Mollusk,
+    result::{Check, ContextResult},
+    Mollusk, MolluskContext,
 };
 use solana_account::Account;
 use solana_sdk::{
@@ -17,6 +20,22 @@ const ID: [u8; 32] = [
 ];
 
 const PROGRAM_ID: &Pubkey = &Pubkey::new_from_array(ID);
+
+// Simple in-memory account store implementation
+#[derive(Default)]
+struct InMemoryAccountStore {
+    accounts: HashMap<Pubkey, Account>,
+}
+
+impl AccountStore for InMemoryAccountStore {
+    fn get_account(&self, pubkey: &Pubkey) -> Option<Account> {
+        self.accounts.get(pubkey).cloned()
+    }
+
+    fn store_account(&mut self, pubkey: Pubkey, account: Account) {
+        self.accounts.insert(pubkey, account);
+    }
+}
 
 #[test]
 fn test_deposit() {
@@ -37,45 +56,50 @@ fn test_deposit() {
         (system_program, system_program_account),
     ];
 
-    let amount = LAMPORTS_PER_SOL;
-    let deposit_result = deposit(&mollusk, &accounts, amount);
+    let mut store = InMemoryAccountStore::default();
+    for (pubkey, account) in &accounts {
+        store.store_account(pubkey.clone(), account.clone());
+    }
+    let context = mollusk.with_context(store);
 
-    // Deposit checks
-    deposit_result.run_checks(
-        &[
-            Check::account(&payer)
-                .lamports(starting_lamports - amount) // Payer pays
-                .build(),
-            Check::account(&vault_pubkey)
-                .lamports(amount) // Vault receives
-                .build(),
-        ],
-        &mollusk.config,
-        &mollusk,
-    );
+    let amount = LAMPORTS_PER_SOL;
+
+    let deposit_checks = &[
+        Check::success(),
+        Check::account(&payer)
+            .lamports(starting_lamports - amount) // Payer pays
+            .build(),
+        Check::account(&vault_pubkey)
+            .lamports(amount) // Vault receives
+            .build(),
+    ];
+
+    let account_pubkeys = &accounts.map(|a| a.0);
+    let _deposit_result = deposit(&context, account_pubkeys, amount, deposit_checks);
+
+    let withdraw_checks = &[
+        Check::success(),
+        Check::account(&payer)
+            .lamports(starting_lamports) // Payer receives
+            .build(),
+        Check::account(&vault_pubkey)
+            .lamports(0) // Vault pays
+            .build(),
+    ];
 
     // Test withdrraw
-    let withdraw_result = withdraw(&mollusk, &accounts);
-
-    // withdraw checks
-    withdraw_result.run_checks(
-        &[
-            Check::account(&payer)
-                .lamports(starting_lamports) // Payer receives
-                .build(),
-            Check::account(&vault_pubkey)
-                .lamports(0) // Vault pays
-                .build(),
-        ],
-        &mollusk.config,
-        &mollusk,
-    );
+    let _withdraw_result = withdraw(&context, account_pubkeys, withdraw_checks);
 }
 
 /*
  * Utils
  */
-fn deposit(mollusk: &Mollusk, accounts: &[(Pubkey, Account)], amount: u64) -> InstructionResult {
+fn deposit(
+    context: &MolluskContext<InMemoryAccountStore>,
+    accounts: &[Pubkey],
+    amount: u64,
+    checks: &[Check],
+) -> ContextResult {
     let [payer, vault, system_program] = accounts else {
         panic!("Could not unpack accounts in deposit")
     };
@@ -88,19 +112,22 @@ fn deposit(mollusk: &Mollusk, accounts: &[(Pubkey, Account)], amount: u64) -> In
         PROGRAM_ID.into(),
         instruction_data.as_slice(),
         vec![
-            AccountMeta::new(payer.0, true),           // owner
-            AccountMeta::new(vault.0, false),          // vault
-            AccountMeta::new(system_program.0, false), // system_program
+            AccountMeta::new(payer.into(), true),           // owner
+            AccountMeta::new(vault.into(), false),          // vault
+            AccountMeta::new(system_program.into(), false), // system_program
         ],
     );
 
-    let result =
-        mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+    let result = context.process_and_validate_instruction(&instruction, checks);
 
     result
 }
 
-fn withdraw(mollusk: &Mollusk, accounts: &[(Pubkey, Account)]) -> InstructionResult {
+fn withdraw(
+    context: &MolluskContext<InMemoryAccountStore>,
+    accounts: &[Pubkey],
+    checks: &[Check],
+) -> ContextResult {
     let [payer, vault, system_program] = accounts else {
         panic!("Could not unpack accounts in withdraw")
     };
@@ -112,14 +139,13 @@ fn withdraw(mollusk: &Mollusk, accounts: &[(Pubkey, Account)]) -> InstructionRes
         PROGRAM_ID.into(),
         instruction_data.as_slice(),
         vec![
-            AccountMeta::new(payer.0, true),           // owner
-            AccountMeta::new(vault.0, false),          // vault
-            AccountMeta::new(system_program.0, false), // system_program
+            AccountMeta::new(payer.into(), true),           // owner
+            AccountMeta::new(vault.into(), false),          // vault
+            AccountMeta::new(system_program.into(), false), // system_program
         ],
     );
 
-    let result =
-        mollusk.process_and_validate_instruction(&instruction, &accounts, &[Check::success()]);
+    let result = context.process_and_validate_instruction(&instruction, checks);
 
     result
 }

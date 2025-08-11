@@ -1,7 +1,6 @@
 use pinocchio::{
     account_info::AccountInfo,
-    instruction::{Account, Seed, Signer},
-    log::sol_log,
+    instruction::{Seed, Signer},
     program_error::ProgramError,
     pubkey::find_program_address,
     ProgramResult,
@@ -35,21 +34,15 @@ impl<'a> TryFrom<&'a [AccountInfo]> for WithdrawAccounts<'a> {
             return Err(ProgramError::InvalidAccountOwner);
         }
 
-        sol_log("withdraw 1");
-
         if vault.lamports().eq(&0) {
             return Err(ProgramError::InvalidAccountData);
         }
 
         let (vault_key, bump) = find_program_address(&[b"vault", owner.key().as_ref()], &crate::ID);
 
-        sol_log("withdraw 2");
-
         if &vault_key != vault.key() {
             return Err(ProgramError::InvalidAccountData);
         }
-
-        sol_log("withdraw 3");
 
         Ok(Self {
             owner,
