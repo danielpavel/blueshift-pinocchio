@@ -1,6 +1,11 @@
+use instructions::Make;
 use pinocchio::{
-    account_info::AccountInfo, program_error::ProgramError, pubkey::Pubkey, ProgramResult,
+    account_info::AccountInfo, entrypoint, nostd_panic_handler, program_error::ProgramError,
+    pubkey::Pubkey, ProgramResult,
 };
+
+entrypoint!(process_instruction);
+nostd_panic_handler!();
 
 pub mod instructions;
 pub mod state;
@@ -17,5 +22,8 @@ fn process_instruction(
     accounts: &[AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    Err(ProgramError::InvalidAccountData)
+    match instruction_data.split_first() {
+        Some((Make::DISCRIMINATOR, data)) => Make::try_from((data, accounts))?.process(),
+        _ => Err(ProgramError::InvalidInstructionData),
+    }
 }
