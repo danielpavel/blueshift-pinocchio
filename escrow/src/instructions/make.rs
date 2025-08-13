@@ -1,3 +1,4 @@
+use core::mem::size_of;
 use pinocchio::{
     account_info::AccountInfo, instruction::Seed, program_error::ProgramError,
     pubkey::find_program_address, ProgramResult,
