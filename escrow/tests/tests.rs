@@ -118,7 +118,25 @@ fn test_make() {
 
     let amount = starting_tokens_amount / 10;
     let receive = 1000 * 10u32.pow(DECIMALS as u32);
-    let make_checks = &[Check::success()];
+
+    let maker_final_amount = starting_tokens_amount - amount;
+    let maker_amount_bytes = maker_final_amount.to_le_bytes();
+    let escrow_amount_bytes = amount.to_le_bytes();
+
+    // Checks:
+    //  - Success
+    //  - Maker ATA's account has `starting_tokens_amount - amount`. This is achieved by comparing
+    //  directly into the data of the Token Account (e.g. amount starts at offset 64)
+    //  - Escrow ATA account has `amount` tokens.
+    let make_checks = &[
+        Check::success(),
+        Check::account(&maker_ata_pubkey)
+            .data_slice(64, &maker_amount_bytes)
+            .build(),
+        Check::account(&escrow_ata_pubkey.0)
+            .data_slice(64, &escrow_amount_bytes)
+            .build(),
+    ];
 
     let account_pubkeys = &accounts.map(|a| a.0);
     let _make_result = make(
