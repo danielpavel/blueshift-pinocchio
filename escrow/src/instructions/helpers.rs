@@ -213,6 +213,7 @@ pub trait AssociateTokenAccountInit {
     fn init(
         payer: &AccountInfo,
         account: &AccountInfo,
+        owner: &AccountInfo,
         mint: &AccountInfo,
         system_program: &AccountInfo,
         token_program: &AccountInfo,
@@ -220,6 +221,7 @@ pub trait AssociateTokenAccountInit {
     fn init_if_needed(
         payer: &AccountInfo,
         account: &AccountInfo,
+        owner: &AccountInfo,
         mint: &AccountInfo,
         system_program: &AccountInfo,
         token_program: &AccountInfo,
@@ -230,6 +232,7 @@ impl AssociateTokenAccountInit for AssociatedTokenAccount {
     fn init(
         payer: &AccountInfo,
         account: &AccountInfo,
+        owner: &AccountInfo,
         mint: &AccountInfo,
         system_program: &AccountInfo,
         token_program: &AccountInfo,
@@ -238,7 +241,7 @@ impl AssociateTokenAccountInit for AssociatedTokenAccount {
             funding_account: payer,
             account,
             mint,
-            wallet: payer,
+            wallet: owner,
             system_program,
             token_program,
         }
@@ -248,13 +251,14 @@ impl AssociateTokenAccountInit for AssociatedTokenAccount {
     fn init_if_needed(
         payer: &AccountInfo,
         account: &AccountInfo,
+        owner: &AccountInfo,
         mint: &AccountInfo,
         system_program: &AccountInfo,
         token_program: &AccountInfo,
     ) -> ProgramResult {
         match Self::check(account, mint, payer, token_program) {
             Ok(_) => Ok(()),
-            Err(_) => Self::init(payer, account, mint, system_program, token_program),
+            Err(_) => Self::init(payer, account, owner, mint, system_program, token_program),
         }
     }
 }

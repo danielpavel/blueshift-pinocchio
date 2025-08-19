@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use mollusk_svm::{
     account_store::AccountStore,
     program::keyed_account_for_system_program,
-    result::{Check, ContextResult},
+    result::{compare, Check, ContextResult},
     Mollusk, MolluskContext,
 };
 use solana_account::Account;
@@ -86,6 +86,9 @@ fn test_deposit() {
             .lamports(0) // Vault pays
             .build(),
     ];
+
+    let config = &context.mollusk.config;
+    compare::compare!(config, "token amount", 0, 1);
 
     // Test withdrraw
     let _withdraw_result = withdraw(&context, account_pubkeys, withdraw_checks);

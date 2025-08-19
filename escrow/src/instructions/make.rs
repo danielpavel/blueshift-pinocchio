@@ -32,7 +32,7 @@ impl<'a> TryFrom<&'a [AccountInfo]> for MakeAccounts<'a> {
     type Error = ProgramError;
 
     fn try_from(accounts: &'a [AccountInfo]) -> Result<Self, Self::Error> {
-        let [maker, escrow, a_mint, b_mint, maker_ata, escrow_ata, system_program, token_program] =
+        let [maker, escrow, a_mint, b_mint, maker_ata, escrow_ata, system_program, token_program, _associated_token_program] =
             accounts
         else {
             return Err(ProgramError::NotEnoughAccountKeys);
@@ -75,9 +75,9 @@ impl<'a> TryFrom<&'a [u8]> for MakeInstructionData {
             return Err(ProgramError::InvalidInstructionData);
         }
 
-        let amount = u64::from_le_bytes(data[0..7].try_into().unwrap());
-        let receive = u64::from_le_bytes(data[8..15].try_into().unwrap());
-        let seed = u64::from_le_bytes(data[16..23].try_into().unwrap());
+        let amount = u64::from_le_bytes(data[0..8].try_into().unwrap());
+        let receive = u64::from_le_bytes(data[8..16].try_into().unwrap());
+        let seed = u64::from_le_bytes(data[16..24].try_into().unwrap());
 
         if amount.eq(&0) {
             return Err(ProgramError::InvalidInstructionData);
@@ -133,6 +133,7 @@ impl<'a> TryFrom<(&'a [u8], &'a [AccountInfo])> for Make<'a> {
         AssociatedTokenAccount::init(
             accounts.maker,
             accounts.escrow_ata,
+            accounts.escrow,
             accounts.a_mint,
             accounts.system_program,
             accounts.token_program,
